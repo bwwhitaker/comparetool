@@ -1,5 +1,6 @@
 import pandas as pd
 import codecs
+import difflib
 
 class SubStreamToGrid:
     def __init__(self, file):
@@ -14,19 +15,19 @@ class SubStreamToGrid:
         frameMultiplier = 0
         dropFrame = False
         if "23.98" in documentFramerate:
-            frameMultiplier += 24
+            frameMultiplier = 24
             dropFrame = False
-        elif "24" in documentFramerate:
-            frameMultiplier += 24
+        elif "FILM" in documentFramerate:
+            frameMultiplier = 24
             dropFrame = False
         elif "PAL" in documentFramerate:
-            frameMultiplier += 25
+            frameMultiplier = 25
             dropFrame = False
-        elif "NTSC NDF" in documentFramerate:
-            frameMultiplier += 30
+        elif "NDF" in documentFramerate:
+            frameMultiplier = 30
             dropFrame = False
-        elif "NTSC DF" in documentFramerate:
-            frameMultiplier += 30
+        elif "DF" in documentFramerate:
+            frameMultiplier = 30
             dropFrame = True
 
         def TimecodeConvertor(timecode):
@@ -35,16 +36,20 @@ class SubStreamToGrid:
             Minutes = int(timecode_split[1])
             Seconds = int(timecode_split[2])
             Frames = int(timecode_split[3])
-            TC_inFrames = 0
-            TC_inFrames += ((Hours * 60 * 60) + (Minutes * 60) + Seconds) * frameMultiplier + Frames
+            if dropFrame == False:
+                TC_inFrames = 0
+                TC_inFrames += ((Hours * 60 * 60) + (Minutes * 60) + Seconds) * frameMultiplier + Frames
             if dropFrame == True:
-                DF_Minutes_Total = Hours * 60 + Minutes
-                DF_Minutes_Modulo = (DF_Minutes_Total % 10)
-                DF_Minutes_10_chunk = (DF_Minutes_Total - DF_Minutes_Modulo) / 10
-                TC_inFrames -= (DF_Minutes_10_chunk * 18 + DF_Minutes_Modulo * 2)
-                return int(TC_inFrames)
-            else:
-                return TC_inFrames
+                DF_Minutes = Hours * 60 + Minutes
+                if DF_Minutes >= 10:
+                    DF_Modulo = DF_Minutes % 10
+                    DF_10_chunk = (DF_Minutes - DF_Modulo) / 10
+                    TC_adjuster = Minutes * ((DF_10_chunk * 18) + (DF_Modulo * 2))
+                elif DF_Minutes <= 9:
+                    TC_adjuster = Minutes * 2
+                TC_inFrames = 0
+                TC_inFrames += ((Hours * 60 * 60) + (Minutes * 60) + Seconds) * frameMultiplier + Frames - TC_adjuster
+            return int(TC_inFrames)
 
         filecontent = []
         f = codecs.open(file, 'r', 'utf-16le')
@@ -67,5 +72,7 @@ class SubStreamToGrid:
         grid['TC_out_frames'] = grid.TC_out.apply(TimecodeConvertor)
         return grid
 
-print(SubStreamToGrid.generateTable('ystar-tra1-swe-vod-2398-876590.das'))
-print(SubStreamToGrid.generateTable('y-eng-FT.das'))
+##print(SubStreamToGrid.generateTable('ystar-tra1-swe-vod-2398-876590.das'))
+##print(SubStreamToGrid.generateTable('24eng.das'))
+print(SubStreamToGrid.generateTable('NTSCDF2997ENg.das'))
+print(SubStreamToGrid.generateTable('NTSCS30ENg.das'))
